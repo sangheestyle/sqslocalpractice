@@ -1,0 +1,30 @@
+dockerversion: '3'
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    volumes:
+      - "./api:/src/api"
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    depends_on:
+      - sqs
+
+  tenantreader:
+    build:
+      context: ./tenantreader
+      dockerfile: Dockerfile
+    volumes:
+      - "./tenantreader:/src/tenantreader"
+    depends_on:
+      - sqs
+
+  sqs:
+    image: s12v/elasticmq
+    ports:
+    - "9324:9324"
+    volumes:
+    - ./config/elasticmq.conf:/etc/elasticmq/elasticmq.conf
