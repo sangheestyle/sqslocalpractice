@@ -8,7 +8,6 @@ const sqs = new AWS.SQS({
     endpoint: "http://sqs:9324"
 });
 
-const newMailboxesQueueURL = "http://sqs:9324/queue/newmailboxes";
 const scanningQueueURL = "http://sqs:9324/queue/forscanning";
 
 const timeoutPromise = (timeout) => new Promise((resolve) => setTimeout(resolve, timeout));
@@ -21,7 +20,7 @@ const runFor = async (interval) => {
             AttributeNames: [
                 "SentTimestamp"
             ],
-            MaxNumberOfMessages: 1,
+            MaxNumberOfMessages: 10,
             MessageAttributeNames: [
                 "All"
             ],
@@ -40,11 +39,7 @@ const runFor = async (interval) => {
                     };
                     // do job in visivilitytimeout then try delete
                     numSubscription ++;
-                    const messageBody = JSON.parse(message.Body);
-                    for (let email of messageBody["newMailboxes"]){
-                        
-                    }
-                    console.log(`${numSubscription}:Get new mailboxes from: ${message.Body} - ${message.MessageId}`);
+                    console.log(`${numSubscription}:Scanning ${message.Body} - ${message.MessageId}`);
                     sqs.deleteMessage(deleteParams, (err, data) => {
                         if (err) {
                             console.log("Delete Error", err);
