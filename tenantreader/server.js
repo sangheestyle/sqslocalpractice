@@ -8,19 +8,8 @@ const sqs = new AWS.SQS({
     endpoint: "http://sqs:9324"
 });
 
-const queueURL = "http://sqs:9324/queue/newtenants";
-const params = {
-    AttributeNames: [
-        "SentTimestamp"
-    ],
-    MaxNumberOfMessages: 10,
-    MessageAttributeNames: [
-        "All"
-    ],
-    QueueUrl: queueURL,
-    VisibilityTimeout: 30,
-    WaitTimeSeconds: 0
-};
+const newTenantsQueueURL = "http://sqs:9324/queue/newtenants";
+const newMailboxesQueueURL = "http://sqs:9324/queue/newmailboxes";
 
 const timeoutPromise = (timeout) => new Promise((resolve) => setTimeout(resolve, timeout));
 const runFor = async (interval) => {
@@ -28,30 +17,71 @@ const runFor = async (interval) => {
     while (true) {
         await timeoutPromise(interval);
 
-        sqs.receiveMessage(params, (err, data) => {
+        const newTenantsQueueParams = {
+            AttributeNames: [
+                "SentTimestamp"
+            ],
+            MaxNumberOfMessages: 10,
+            MessageAttributeNames: [
+                "All"
+            ],
+            QueueUrl: newTenantsQueueURL,
+            VisibilityTimeout: 30,
+            WaitTimeSeconds: 0
+        };
+        sqs.receiveMessage(newTenantsQueueParams, (err, data) => {
             if (err) {
               console.log("Receive Error", err);
             } else if (data.Messages) {
                 for (let message of data.Messages) {
-                    const deleteParams = {
-                        QueueUrl: queueURL,
-                        ReceiptHandle: message.ReceiptHandle
-                    };
-                    // do job in visivilitytimeout then try delete
+                                        // do job in visivilitytimeout then try delete
                     numSubscription ++;
                     console.log(`${numSubscription}: Ret mailboxes from: ${message.Body} - ${message.MessageId}`);
-                    sqs.deleteMessage(deleteParams, (err, data) => {
+
+                    // send a message including emails
+                    const messageBody = {
+                        newMailboxes: [
+                            "a@mail.com",
+                            "b@mail.com",
+                        ],
+                    };
+                    const params = {
+                        DelaySeconds: 1,
+                        MessageAttributes: {
+                            "MessageBodyType": {
+                                DataType: "String",
+                                StringValue: "JSON"
+                            },
+                        },
+                        MessageBody: JSON.stringify(messageBody),
+                        QueueUrl: newMailboxesQueueURL,
+                    };
+                       
+                    sqs.sendMessage(params, (err, data) => {
                         if (err) {
-                            console.log("Delete Error", err);
+                            // ERROR
                         } else {
-                            // deleted
+                            // OK
+                            const deleteParams = {
+                                QueueUrl: newTenantsQueueURL,
+                                ReceiptHandle: message.ReceiptHandle
+                            };
+
+                            sqs.deleteMessage(deleteParams, (err, data) => {
+                                if (err) {
+                                    console.log("Delete Error", err);
+                                } else {
+                                    // deleted
+                                }
+                            });
                         }
                     });
+
                 }
             }
         });
     }
 };
 
-console.log("RUN!");
+console.log("RUN: tenantreader!");
 runFor(1000);
